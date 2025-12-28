@@ -17,7 +17,7 @@ static const size_t NUM_AFFORDABLE_MODELS = sizeof(AFFORDABLE_MODELS) / sizeof(A
 
 GPTService::GPTService()
 	: _model("gpt-5-nano")
-	, _systemMessage('Respond with thoughtful pauses ("Hmm...", "Well...") and be curious. Keep answers under 250 characters, playful, and supportive. Offer quick reflections, light humor, and gentle encouragement.')
+	, _systemMessage("Respond with thoughtful pauses (\"Hmm...\", \"Well...\") and be curious. Keep answers under 250 characters, playful, and supportive. Offer quick reflections, light humor, and gentle encouragement. Do not use any emoticons or emojis.")
 	, _initialized(false)
 	, _contextCache(10) // Keep last 10 messages
 	, _previousResponseId("") // Initialize empty for first conversation
@@ -108,7 +108,7 @@ void GPTService::sendPromptWithContext(const String& prompt,
 		http.begin(client, "https://api.openai.com/v1/responses");
 		http.addHeader("Content-Type", "application/json");
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
-		// http.setTimeout(30000); // 30 second timeout
+		http.setTimeout(30000); // 30 second timeout
 
 		ESP_LOGI("GPT", "Sending request to OpenAI API...");
 
