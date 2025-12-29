@@ -128,6 +128,7 @@ private:
 	String _systemMessage;
 	bool _initialized;
 	ContextCache _contextCache;
+	bool _storeResponse; // Store gpt response as cache token
 	String _previousResponseId; // For conversation state
 
 	// Process API response

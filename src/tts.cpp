@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <vector>
+#include "core.h"
 
 // Available TTS voices
 static const GPTTtsVoice AVAILABLE_VOICES[] = {
@@ -91,10 +92,9 @@ void GPTTtsService::textToSpeech(const String& text, const String& voice, AudioC
 		auto& [service, payload, txt, cb] = *params;
 
 		HTTPClient http;
-		WiFiClientSecure client;
-		client.setInsecure(); // For HTTPS without certificate validation
+		wifiClient.setInsecure(); // For HTTPS without certificate validation
 
-		http.begin(client, "https://api.openai.com/v1/audio/speech");
+		http.begin(wifiClient, "https://api.openai.com/v1/audio/speech");
 		http.setReuse(false);
 		http.addHeader("Content-Type", "application/json");
 		http.addHeader("Accept", "*/*");

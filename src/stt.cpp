@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <FS.h>
+#include "core.h"
 
 // Available transcription models
 static const GPTSttModel AVAILABLE_MODELS[] = {
@@ -120,10 +121,9 @@ void GPTSttService::transcribeAudio(const String& filePath, const String& model,
 		auto& [service, payload, file, bnd, cb] = *params;
 
 		HTTPClient http;
-		WiFiClientSecure client;
-		client.setInsecure(); // For HTTPS without certificate validation
+		wifiClient.setInsecure(); // For HTTPS without certificate validation
 
-		http.begin(client, "https://api.openai.com/v1/audio/transcriptions");
+		http.begin(wifiClient, "https://api.openai.com/v1/audio/transcriptions");
 		http.addHeader("Content-Type", "multipart/form-data; boundary=" + bnd);
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
 		http.setTimeout(30000); // 30 second timeout

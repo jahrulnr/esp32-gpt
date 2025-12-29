@@ -1,6 +1,7 @@
 #include "gpt.h"
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
+#include "core.h"
 
 // Affordable GPT models sorted by cost (cheapest first)
 static const GPTModel AFFORDABLE_MODELS[] = {
@@ -21,6 +22,7 @@ GPTService::GPTService()
 	, _initialized(false)
 	, _contextCache(10) // Keep last 10 messages
 	, _previousResponseId("") // Initialize empty for first conversation
+	, _storeResponse(true)
 {
 }
 
@@ -52,11 +54,11 @@ String GPTService::buildJsonPayload(const String& userPrompt, const std::vector<
 	reasoning["effort"] = "low";
 
 	// Include previous response ID for conversation continuity
-	if (_previousResponseId.length() > 0) {
+	if (_storeResponse && !_previousResponseId.isEmpty()) {
 		doc["previous_response_id"] = _previousResponseId;
 	}
 
-	doc["store"] = false;
+	doc["store"] = _storeResponse; // store response to gpt
 
 	String jsonString;
 	serializeJson(doc, jsonString);
@@ -102,10 +104,9 @@ void GPTService::sendPromptWithContext(const String& prompt,
 		auto& [service, payload, cb] = *params;
 
 		HTTPClient http;
-		WiFiClientSecure client;
-		client.setInsecure(); // For HTTPS without certificate validation
+		wifiClient.setInsecure(); // For HTTPS without certificate validation
 
-		http.begin(client, "https://api.openai.com/v1/responses");
+		http.begin(wifiClient, "https://api.openai.com/v1/responses");
 		http.setReuse(false);
 		http.addHeader("Content-Type", "application/json");
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
@@ -173,7 +174,7 @@ String GPTService::extractResponse(const String& jsonResponse) {
 	}
 
 	// Extract and store response ID for conversation continuity
-	if (doc["id"].is<String>()) {
+	if (_storeResponse && doc["id"].is<String>()) {
 		_previousResponseId = doc["id"].as<String>();
 	}
 
