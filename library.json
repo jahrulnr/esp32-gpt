@@ -1,8 +1,8 @@
 {
   "name": "ESP32-GPT",
   "version": "1.0.0",
-  "description": "This library enables ESP32 devices to communicate with OpenAI's GPT models and generate text-to-speech audio via HTTP API calls. It includes features like conversation context management, model selection, callback-based responses, and TTS functionality for easy integration into Arduino projects.",
-  "keywords": "esp32, openai, gpt, tts",
+  "description": "This library enables ESP32 devices to communicate with OpenAI GPT models, generate text-to-speech audio, and transcribe audio files via HTTP API calls. It includes features like conversation context management, model selection, callback-based responses, and TTS/transcription functionality for easy integration into Arduino projects.",
+  "keywords": "esp32, openai, gpt, tts, transcription",
   "homepage": "https://github.com/jahrulnr/esp32-gpt",
   "repository": {
     "type": "git",

@@ -95,6 +95,7 @@ void GPTTtsService::textToSpeech(const String& text, const String& voice, AudioC
 		client.setInsecure(); // For HTTPS without certificate validation
 
 		http.begin(client, "https://api.openai.com/v1/audio/speech");
+		http.setReuse(false);
 		http.addHeader("Content-Type", "application/json");
 		http.addHeader("Accept", "*/*");
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
@@ -106,29 +107,6 @@ void GPTTtsService::textToSpeech(const String& text, const String& voice, AudioC
 			"Content-Length", 
 			"Transfer-Encoding", 
 			"Connection", 
-			"X-Request-ID", 
-			"OpenAI-Processing-MS", 
-			"Date",
-			"access-control-expose-headers",
-			"openai-organization",
-			"openai-processing-ms",
-			"openai-project",
-			"openai-version",
-			"x-envoy-upstream-service-time",
-			"x-ratelimit-limit-requests",
-			"x-ratelimit-limit-tokens",
-			"x-ratelimit-remaining-requests",
-			"x-ratelimit-remaining-tokens",
-			"x-ratelimit-reset-requests",
-			"x-ratelimit-reset-tokens",
-			"x-request-id",
-			"x-openai-proxy-wasm",
-			"cf-cache-status",
-			"Strict-Transport-Security",
-			"X-Content-Type-Options",
-			"Server",
-			"CF-RAY",
-			"alt-svc"
 		};
 		http.collectHeaders(headerKeys, sizeof(headerKeys)/sizeof(headerKeys[0]));
 

@@ -8,7 +8,8 @@ An Arduino library for ESP32 microcontrollers to communicate with OpenAI GPT mod
 - Conversation context caching for multi-turn conversations
 - Multiple model support (gpt-5-nano, gpt-4o-mini, etc.)
 - Text-to-speech (TTS) functionality with multiple voice options
-- Asynchronous HTTP requests with callback responses for both GPT and TTS
+- Audio transcription using OpenAI's Whisper API
+- Asynchronous HTTP requests with callback responses for GPT, TTS, and transcription
 - Easy integration with Arduino projects
 
 ## Installation
@@ -119,20 +120,64 @@ void loop() {
 }
 ```
 
-### Advanced TTS Usage
+### Audio Transcription Example
 
 ```cpp
-// Set custom voice
-aiTts.setVoice("alloy");
+#include <WiFi.h>
+#include <SPIFFS.h>
+#include <transcription.h>
 
+// Replace with your credentials
+const char* ssid = "your-ssid";
+const char* password = "your-password";
+#define TRANSCRIPTION_API_KEY "your-openai-api-key"
+
+// Callback for transcription responses
+void transcriptionCallback(const String& filePath, const String& transcription, const String& usageJson) {
+    Serial.println("Transcription completed!");
+    Serial.printf("File: %s\n", filePath.c_str());
+    Serial.printf("Transcription: %s\n", transcription.c_str());
+    Serial.printf("Usage: %s\n", usageJson.c_str());
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Initialize SPIFFS
+    if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS Mount Failed");
+        return;
+    }
+    
+    // Connect WiFi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+    }
+    
+    // Initialize transcription service
+    aiStt.init(TRANSCRIPTION_API_KEY, LittleFS);
+    
+    // Transcribe audio file (must be WAV format)
+    aiStt.transcribeAudio("/audio.wav", transcriptionCallback);
+}
+
+void loop() {
+    // Your code here
+}
+```
+
+### Advanced Transcription Usage
+
+```cpp
 // Set custom model
-aiTts.setModel("tts-1");
+aiStt.setModel("whisper-1");
 
-// Generate speech with specific voice
-aiTts.textToSpeech("Hello!", "alloy", ttsCallback);
+// Transcribe with specific model
+aiStt.transcribeAudio("/audio.wav", "gpt-4o-transcribe", transcriptionCallback);
 
-// Get available voices
-auto voices = GPTTtsService::getAvailableVoices();
+// Get available models
+auto models = GPTSttService::getAvailableModels();
 ```
 
 ## GPT API Reference
@@ -179,6 +224,26 @@ void textToSpeech(const String& text, const String& voice, AudioCallback callbac
 void setModel(const String& model)
 void setVoice(const String& voice)
 static std::vector<gpt_tts_t> getAvailableVoices()
+```
+
+## Transcription API Reference
+
+### Transcription Initialization
+```cpp
+bool init(const String& apiKey, fs::FS& fs)
+bool isInitialized() const
+```
+
+### Transcribing Audio
+```cpp
+void transcribeAudio(const String& filePath, TranscriptionCallback callback)
+void transcribeAudio(const String& filePath, const String& model, TranscriptionCallback callback)
+```
+
+### Transcription Configuration
+```cpp
+void setModel(const String& model)
+static std::vector<gpt_transcription_t> getAvailableModels()
 ```
 
 - ESP32 board

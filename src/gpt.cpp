@@ -106,6 +106,7 @@ void GPTService::sendPromptWithContext(const String& prompt,
 		client.setInsecure(); // For HTTPS without certificate validation
 
 		http.begin(client, "https://api.openai.com/v1/responses");
+		http.setReuse(false);
 		http.addHeader("Content-Type", "application/json");
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
 		http.setTimeout(30000); // 30 second timeout
