@@ -130,8 +130,8 @@ void GPTTtsService::textToSpeech(const String& text, const String& voice, AudioC
 			
 			// For chunked responses, contentLength will be -1
 			// We'll read data until stream ends
-			const size_t BUFFER_SIZE = 4096;
-			uint8_t buffer[BUFFER_SIZE];
+			const size_t BUFFER_SIZE = 1024 * 100;
+			uint8_t* buffer = (uint8_t*) heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t totalBytesRead = 0;
 			std::vector<uint8_t> audioData;
 			
