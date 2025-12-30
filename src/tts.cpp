@@ -47,6 +47,7 @@ String GPTTtsService::buildJsonPayload(const String& text) {
 	doc["model"] = _model;
 	doc["input"] = text;
 	doc["voice"] = _voice;
+	doc["instructions"] = "Speak with very high energy, super cheerful, enthusiastic, upbeat, and motivational. Sound excited, smiling, and full of positive vibes, like a hype speaker starting an amazing day.";
 
 	String jsonString;
 	serializeJson(doc, jsonString);
