@@ -54,9 +54,19 @@ String GPTSttService::buildMultipartPayload(const String& filePath, const String
 		return "";
 	}
 
-	while (file.available()) {
-		payload += (char)file.read();
+	int bufferSize = 1024 * 100;
+	uint8_t* buffer = (uint8_t*) heap_caps_malloc(bufferSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
+	if (!buffer) {
+		ESP_LOGE("TRANSCRIPTION", "Failed to allocate memory for file content");
+		file.close();
+		return "";
 	}
+	
+	while (file.available()) {
+		size_t bytes = file.read(buffer, bufferSize);
+		payload += String((const char*) buffer, bytes);
+	}
+	delete[] buffer;
 	file.close();
 
 	payload += "\r\n";
@@ -148,7 +158,7 @@ void GPTSttService::transcribeAudio(const String& filePath, const String& model,
 		delete params;
 		params = nullptr;
 		vTaskDelete(NULL);
-	}, "Transcription_Request", 16384, new std::tuple<GPTSttService*, String, String, String, TranscriptionCallback>(this, multipartPayload, filePath, boundary, callback), 1, NULL, 1);
+	}, "Transcription_Request", 16384, new std::tuple<GPTSttService*, String, String, String, TranscriptionCallback>(this, multipartPayload, filePath, boundary, callback), 1, NULL, 0);
 }
 
 void GPTSttService::processResponse(int httpCode, const String& response, const String& filePath, TranscriptionCallback callback) {
