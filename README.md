@@ -10,8 +10,8 @@ An Arduino library for ESP32 microcontrollers to communicate with OpenAI GPT mod
 - Text-to-speech (TTS) functionality with multiple voice options
 - Streaming TTS for real-time audio generation with lower latency
 - Audio transcription using OpenAI's
-- Speech-to-speech (STS) functionality using OpenAI's Realtime API (untested)
-- Continuous streaming STS for real-time voice conversations (untested)
+- Speech-to-speech (STS) functionality using OpenAI's Realtime API
+- Continuous streaming STS for real-time voice conversations
 - Asynchronous HTTP/WebSocket requests with callback responses for GPT, TTS, transcription, and STS
 - Easy integration with Arduino projects
 
@@ -337,6 +337,35 @@ aiStt.transcribeAudio("/audio.wav", "gpt-4o-transcribe", transcriptionCallback);
 // Get available models
 auto models = GPTSttService::getAvailableModels();
 ```
+
+## Troubleshooting
+
+### WebSocket Payload Size Issues
+
+**Problem**: When using Speech-to-Speech (STS) streaming with OpenAI's Realtime API, you may encounter WebSocket disconnections with errors like:
+```
+[WS] payload too big! 16207
+```
+
+**Cause**: The ArduinoWebSockets library has a default maximum payload size of 15KB (`WEBSOCKETS_MAX_DATA_SIZE = 15 * 1024`). OpenAI's Realtime API can send audio response payloads that exceed this limit, especially when base64-encoded audio data is transmitted.
+
+**Solution**: Increase the WebSocket buffer size by using a local copy of the ArduinoWebSockets library:
+
+**Move ArduinoWebSockets to local lib folder**:
+- Copy the `arduinoWebSockets` folder from your PlatformIO libdeps to your project's `lib/` folder
+- Edit `lib/arduinoWebSockets/src/WebSockets.h`
+- Change line 66 from:
+  ```cpp
+  #define WEBSOCKETS_MAX_DATA_SIZE (15 * 1024)
+  ```
+  to:
+  ```cpp
+  #define WEBSOCKETS_MAX_DATA_SIZE (500 * 1024)  // 500KB buffer
+  ```
+
+**Recommended Buffer Size**: 500KB provides ample headroom for OpenAI's largest audio responses while staying within ESP32 memory constraints.
+
+**Additional Event Mappings**: The STS implementation includes handlers for all OpenAI Realtime API event types. If you see "Unknown Response type" warnings, ensure you're using the latest version with complete event mapping support.
 
 ## GPT API Reference
 
