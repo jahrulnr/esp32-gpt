@@ -8,6 +8,7 @@ An Arduino library for ESP32 microcontrollers to communicate with OpenAI GPT mod
 - Conversation context caching for multi-turn conversations
 - Multiple model support (gpt-5-nano, gpt-4o-mini, etc.)
 - Text-to-speech (TTS) functionality with multiple voice options
+- Streaming TTS for real-time audio generation with lower latency
 - Audio transcription using OpenAI's Whisper API
 - Asynchronous HTTP requests with callback responses for GPT, TTS, and transcription
 - Easy integration with Arduino projects
@@ -19,6 +20,15 @@ An Arduino library for ESP32 microcontrollers to communicate with OpenAI GPT mod
 3. Restart Arduino IDE
 
 For PlatformIO, add this library to your `lib` folder.
+
+## Examples
+
+The `examples` folder contains sample sketches demonstrating different features:
+
+- `gpt/basic.ino` - Basic GPT conversation
+- `tts/basic.ino` - Regular text-to-speech
+- `tts/streaming.ino` - Streaming text-to-speech for lower latency
+- `transcription/basic.ino` - Audio transcription
 
 ## Usage
 
@@ -113,6 +123,55 @@ void setup() {
     
     // Generate speech
     aiTts.textToSpeech("Hello, world!", ttsCallback);
+}
+
+void loop() {
+    // Your code here
+}
+```
+
+### Streaming Text-to-Speech Example
+
+```cpp
+#include <WiFi.h>
+#include <tts.h>
+
+// Replace with your credentials
+const char* ssid = "your-ssid";
+const char* password = "your-password";
+#define TTS_API_KEY "your-openai-api-key"
+
+// Callback for streaming TTS audio chunks
+void ttsStreamCallback(const String& text, const uint8_t* audioChunk, size_t chunkSize, bool isLastChunk) {
+    Serial.println("TTS Stream Text: " + text);
+    
+    if (audioChunk && chunkSize > 0) {
+        Serial.printf("Audio chunk received: %d bytes, isLast: %s\n", chunkSize, isLastChunk ? "true" : "false");
+        // Process audio chunk immediately for real-time playback
+        // Lower latency compared to waiting for full audio
+        
+        if (isLastChunk) {
+            Serial.println("TTS streaming completed!");
+        }
+    } else if (isLastChunk) {
+        Serial.println("TTS streaming failed - no audio data");
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Connect WiFi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+    }
+    
+    // Initialize TTS
+    aiTts.init(TTS_API_KEY);
+    
+    // Generate speech with streaming for lower latency
+    aiTts.textToSpeechStream("Hello! This streaming TTS allows for real-time audio playback.", ttsStreamCallback);
 }
 
 void loop() {
@@ -217,6 +276,12 @@ bool isInitialized() const
 ```cpp
 void textToSpeech(const String& text, AudioCallback callback)
 void textToSpeech(const String& text, const String& voice, AudioCallback callback)
+```
+
+### Streaming Speech Generation
+```cpp
+void textToSpeechStream(const String& text, StreamCallback callback)
+void textToSpeechStream(const String& text, const String& voice, StreamCallback callback)
 ```
 
 ### TTS Configuration

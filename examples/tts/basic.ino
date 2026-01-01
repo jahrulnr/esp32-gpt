@@ -8,6 +8,7 @@ const char* password = "your-password";
 #define TTS_API_KEY "your-openai-api-key"
 
 // Callback function to handle TTS audio responses
+// Note: For streaming TTS with lower latency, see streaming.ino example
 void ttsAudioCallback(const String& text, const uint8_t* audioData, size_t audioSize) {
     Serial.println("TTS Text: " + text);
 

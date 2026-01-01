@@ -18,6 +18,9 @@ class GPTTtsService {
 public:
 	// Callback type for TTS responses (audio data)
 	using AudioCallback = std::function<void(const String& text, const uint8_t* audioData, size_t audioSize)>;
+	
+	// Callback type for streaming TTS responses (audio chunks)
+	using StreamCallback = std::function<void(const String& text, const uint8_t* audioChunk, size_t chunkSize, bool isLastChunk)>;
 
 	GPTTtsService();
 	~GPTTtsService();
@@ -51,6 +54,21 @@ public:
 	void textToSpeech(const String& text, const String& voice, AudioCallback callback);
 
 	/**
+	 * Convert text to speech with streaming callback
+	 * @param text Text to convert to speech
+	 * @param callback Stream callback for audio chunks
+	 */
+	void textToSpeechStream(const String& text, StreamCallback callback);
+
+	/**
+	 * Convert text to speech with specific voice and streaming callback
+	 * @param text Text to convert to speech
+	 * @param voice Voice to use
+	 * @param callback Stream callback for audio chunks
+	 */
+	void textToSpeechStream(const String& text, const String& voice, StreamCallback callback);
+
+	/**
 	 * Set TTS model
 	 * @param model Model name
 	 */
@@ -73,6 +91,10 @@ private:
 	String _model;
 	String _voice;
 	bool _initialized;
+
+	// Common HTTP request handler
+	template<typename CallbackType>
+	void performTtsRequest(const String& text, const String& voice, CallbackType callback, bool isStreaming);
 
 	// Process API response
 	void processResponse(int httpCode, const String& response, const String& text, AudioCallback callback);
