@@ -142,8 +142,6 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 			WiFiClient* stream = http.getStreamPtr();
 			int contentLength = http.getSize();
 			
-			const size_t BUFFER_SIZE = 1024 * 500;
-			uint8_t* buffer = (uint8_t*)heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			
 			if (streaming) {
 				ESP_LOGI("TTS", "Starting to stream audio data");
@@ -151,56 +149,15 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 				ESP_LOGI("TTS", "Starting to read audio data (Content-Length: %d)", contentLength);
 			}
 			
-			unsigned long startTime = millis();
-			const unsigned long INITIAL_TIMEOUT_MS = 10000;
-			const unsigned long INTER_CHUNK_TIMEOUT_MS = 2000;
-			unsigned long lastDataTime = 0;
-			size_t consecutiveZeroReads = 0;
-			const size_t MAX_ZERO_READS = 10;
-			bool dataReceived = false;
-			bool initialTimeoutActive = true;
+			const size_t BUFFER_SIZE = 1152 * 10;
+			uint8_t* buffer = (uint8_t*)heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t totalBytesProcessed = 0;
-			
 			if constexpr (std::is_same_v<CallbackType, AudioCallback>) {
 				// For non-streaming, accumulate all data
 				std::vector<uint8_t> audioData;
 				
-				while (true) {
-					unsigned long currentTime = millis();
+				while (stream->connected()) {
 					size_t bytesAvailable = stream->available();
-					
-					if (!dataReceived) {
-						if (currentTime - startTime >= INITIAL_TIMEOUT_MS) {
-							ESP_LOGW("TTS", "Initial timeout: no data received after %lu ms", INITIAL_TIMEOUT_MS);
-							break;
-						}
-					} else {
-						if (currentTime - lastDataTime >= INTER_CHUNK_TIMEOUT_MS) {
-							ESP_LOGI("TTS", "Inter-chunk timeout: no data for %lu ms after receiving %d bytes", 
-									INTER_CHUNK_TIMEOUT_MS, totalBytesProcessed);
-							break;
-						}
-					}
-					
-					if (bytesAvailable == 0) {
-						consecutiveZeroReads++;
-						if (consecutiveZeroReads >= MAX_ZERO_READS) {
-							if (dataReceived) {
-								ESP_LOGI("TTS", "Stream ended: %d consecutive zero reads after receiving data", consecutiveZeroReads);
-							} else {
-								ESP_LOGW("TTS", "Stream ended: %d consecutive zero reads, no data received", consecutiveZeroReads);
-							}
-							break;
-						}
-						delay(100);
-						continue;
-					}
-					
-					consecutiveZeroReads = 0;
-					dataReceived = true;
-					lastDataTime = currentTime;
-					initialTimeoutActive = false;
-					
 					size_t bytesToRead = min(bytesAvailable, BUFFER_SIZE);
 					size_t bytesRead = stream->readBytes(buffer, bytesToRead);
 					
@@ -208,12 +165,9 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 						audioData.insert(audioData.end(), buffer, buffer + bytesRead);
 						totalBytesProcessed += bytesRead;
 						ESP_LOGD("TTS", "Read %d bytes, total: %d", bytesRead, totalBytesProcessed);
-					} else {
-						ESP_LOGI("TTS", "Read returned 0 bytes, ending read");
-						break;
 					}
 					
-					delay(1);
+					taskYIELD();
 				}
 				
 				if (totalBytesProcessed > 0) {
@@ -230,46 +184,12 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 					ESP_LOGE("TTS", "No audio data received");
 					cb(txt, nullptr, 0);
 				}
+
 			} else {
 				// For streaming, send data chunks immediately as received
 				
-				while (true) {
-					unsigned long currentTime = millis();
+				while (stream->connected()) {
 					size_t bytesAvailable = stream->available();
-					
-					if (!dataReceived) {
-						if (currentTime - startTime >= INITIAL_TIMEOUT_MS) {
-							ESP_LOGW("TTS", "Initial timeout: no data received after %lu ms", INITIAL_TIMEOUT_MS);
-							cb(txt, nullptr, 0, true);
-							break;
-						}
-					} else {
-						if (currentTime - lastDataTime >= INTER_CHUNK_TIMEOUT_MS) {
-							cb(txt, nullptr, 0, true);
-							break;
-						}
-					}
-					
-					if (bytesAvailable == 0) {
-						consecutiveZeroReads++;
-						if (consecutiveZeroReads >= MAX_ZERO_READS) {
-							if (dataReceived) {
-								// No remaining data to send since we send immediately
-							} else {
-								ESP_LOGW("TTS", "Stream ended: %d consecutive zero reads, no data received", consecutiveZeroReads);
-							}
-							cb(txt, nullptr, 0, true);
-							break;
-						}
-						delay(100);
-						continue;
-					}
-					
-					consecutiveZeroReads = 0;
-					dataReceived = true;
-					lastDataTime = currentTime;
-					initialTimeoutActive = false;
-					
 					size_t bytesToRead = min(bytesAvailable, BUFFER_SIZE);
 					size_t bytesRead = stream->readBytes(buffer, bytesToRead);
 					
@@ -278,13 +198,12 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 						// Send the chunk immediately without accumulation
 						cb(txt, buffer, bytesRead, false);
 						ESP_LOGD("TTS", "Sent chunk (%d bytes)", bytesRead);
-					} else {
-						cb(txt, nullptr, 0, true);
-						break;
 					}
 					
-					// Removed delay(1) to prevent potential data corruption from task yielding during streaming
+					taskYIELD();
 				}
+
+				cb(txt, nullptr, 0, true);
 			}
 			
 			heap_caps_free(buffer);
