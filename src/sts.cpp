@@ -407,17 +407,39 @@ void GPTStsService::streamingTask() {
 						if (_audioResponseCallback) {
 							_audioResponseCallback(audioData.data(), audioData.size(), false);
 						}
+					} else if (type == "response.output_audio.delta" && sessionCreated) {
+						// Received output audio delta (base64 encoded)
+						String audioBase64 = doc["delta"] | "";
+						// Decode base64 to audio data
+						std::vector<uint8_t> audioData = this->base64Decode(audioBase64);
+						if (_audioResponseCallback) {
+							_audioResponseCallback(audioData.data(), audioData.size(), false);
+						}
 					} else if (type == "response.text.delta" && sessionCreated) {
 						String textDelta = doc["delta"] | "";
 						ESP_LOGI("STS", "Received text delta: %s", textDelta.c_str());
+					} else if (type == "response.output_audio_transcript.delta" && sessionCreated) {
+						String textDelta = doc["delta"] | "";
+						ESP_LOGI("STS", "Received output audio transcript delta: %s", textDelta.c_str());
 					} else if (type == "response.created" && sessionCreated) {
 						ESP_LOGI("STS", "Response created");
 					} else if (type == "response.output_item.added" && sessionCreated) {
 						ESP_LOGI("STS", "Response output item added");
 					} else if (type == "response.output_item.done" && sessionCreated) {
 						ESP_LOGI("STS", "Response output item done");
+					} else if (type == "response.content_part.added" && sessionCreated) {
+						ESP_LOGD("STS", "Response content part added");
 					} else if (type == "response.done" && sessionCreated) {
 						ESP_LOGI("STS", "Response completed");
+						if (_audioResponseCallback) {
+							_audioResponseCallback(nullptr, 0, true); // Signal end of response
+						}
+					} else if (type == "conversation.item.added") {
+						ESP_LOGD("STS", "Conversation item added");
+					} else if (type == "conversation.item.done") {
+						ESP_LOGD("STS", "Conversation item done");
+					} else if (type == "input_audio_buffer.committed") {
+						ESP_LOGD("STS", "Input audio buffer committed");
 					} else if (type == "error") {
 						String errorMsg = doc["error"]["message"] | "Unknown error";
 						ESP_LOGE("STS", "WebSocket error: %s", errorMsg.c_str());
@@ -445,10 +467,10 @@ void GPTStsService::streamingTask() {
 				ESP_LOGW("STS", "Received fragmented message - not handled");
 				break;
 			case WStype_PING:
-				ESP_LOGD("STS", "Received PING");
+				ESP_LOGI("STS", "Received PING");
 				break;
 			case WStype_PONG:
-				ESP_LOGD("STS", "Received PONG");
+				ESP_LOGI("STS", "Received PONG");
 				break;
 			case WStype_DISCONNECTED:
 				ESP_LOGI("STS", "WebSocket disconnected");
