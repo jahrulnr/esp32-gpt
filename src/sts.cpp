@@ -1,10 +1,8 @@
 #include "sts.h"
 
-#include <WiFiClientSecure.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <FS.h>
-#include <WebSocketsClient.h>
 #include "core.h"
 
 // Available STS models
@@ -24,6 +22,7 @@ GPTStsService::GPTStsService()
 	, _fs(nullptr)
 	, _isStreaming(false)
 	, _streamingTask(nullptr)
+	, _isGPTSpeaking(false)
 {
 }
 
@@ -101,143 +100,138 @@ void GPTStsService::speechToSpeechStream(const String& filePath, const String& m
 }
 
 void GPTStsService::performStsStreaming(const String& filePath, const String& model, StreamCallback callback) {
-	WebSocketsClient webSocket;
-	WiFiClientSecure client;
-	client.setInsecure();
-
 	// WebSocket event handler
-		webSocket.onEvent([this, &filePath, &callback, &webSocket](WStype_t type, uint8_t* payload, size_t length) {
-		switch (type) {
-			case WStype_CONNECTED:
-				ESP_LOGI("STS", "WebSocket connected");
-				// Send session configuration
-				{
-					String config = this->buildSessionConfig();
-					webSocket.sendTXT(config);
+	gptWebSocket.onEvent([this, &filePath, &callback, &gptWebSocket](WStype_t type, uint8_t* payload, size_t length) {
+	switch (type) {
+		case WStype_CONNECTED:
+			ESP_LOGI("STS", "WebSocket connected");
+			// Send session configuration
+			{
+				String config = this->buildSessionConfig();
+				gptWebSocket.sendTXT(config);
+			}
+			break;
+		case WStype_TEXT:
+			{
+				GPTSpiJsonDocument doc;
+				DeserializationError error = deserializeJson(doc, payload, length);
+				if (error) {
+					ESP_LOGE("STS", "Failed to parse WebSocket message: %s", error.c_str());
+					return;
 				}
-				break;
-			case WStype_TEXT:
-				{
-					GPTSpiJsonDocument doc;
-					DeserializationError error = deserializeJson(doc, payload, length);
-					if (error) {
-						ESP_LOGE("STS", "Failed to parse WebSocket message: %s", error.c_str());
-						return;
-					}
 
-					String type = doc["type"] | "";
-					if (type == "session.created") {
-						ESP_LOGI("STS", "Session created");
-						// Now send audio data
-						// For simplicity, send the whole file at once
-						// In real implementation, stream in chunks
-						File file = this->_fs->open(filePath, "r");
-						if (file) {
-							size_t fileSize = file.size();
-							uint8_t* buffer = (uint8_t*) heap_caps_malloc(fileSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
-							if (buffer) {
-								file.read(buffer, fileSize);
-								file.close();
+				String type = doc["type"] | "";
+				if (type == "session.created") {
+					ESP_LOGI("STS", "Session created");
+					// Now send audio data
+					// For simplicity, send the whole file at once
+					// In real implementation, stream in chunks
+					File file = this->_fs->open(filePath, "r");
+					if (file) {
+						size_t fileSize = file.size();
+						uint8_t* buffer = (uint8_t*) heap_caps_malloc(fileSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
+						if (buffer) {
+							file.read(buffer, fileSize);
+							file.close();
 
-								// Send audio data as base64
-								String audioData = this->base64Encode(buffer, fileSize);
-								String audioMessage = "{\"type\":\"input_audio_buffer.append\",\"audio\":\"" + audioData + "\"}";
-								webSocket.sendTXT(audioMessage);
+							// Send audio data as base64
+							String audioData = this->base64Encode(buffer, fileSize);
+							String audioMessage = "{\"type\":\"input_audio_buffer.append\",\"audio\":\"" + audioData + "\"}";
+							gptWebSocket.sendTXT(audioMessage);
 
-								// Commit the audio buffer
-								webSocket.sendTXT("{\"type\":\"input_audio_buffer.commit\"}");
+							// Commit the audio buffer
+							gptWebSocket.sendTXT("{\"type\":\"input_audio_buffer.commit\"}");
 
-								// Create response
-								webSocket.sendTXT("{\"type\":\"response.create\"}");
+							// Create response
+							gptWebSocket.sendTXT("{\"type\":\"response.create\"}");
 
-								free(buffer);
-							} else {
-								file.close();
-							}
+							free(buffer);
+						} else {
+							file.close();
 						}
-					} else if (type == "response.audio.delta") {
-						// Received audio delta (base64 encoded)
-						String audioBase64 = doc["delta"] | "";
-						// Decode base64 to audio data
-						std::vector<uint8_t> audioData = this->base64Decode(audioBase64);
-						callback(filePath, audioData.data(), audioData.size(), false);
-					} else if (type == "response.audio.done") {
-						ESP_LOGI("STS", "Response audio done");
-						callback(filePath, nullptr, 0, true);
-						webSocket.disconnect();
-					} else if (type == "error") {
-						String errorMsg = doc["error"]["message"] | "Unknown error";
-						ESP_LOGE("STS", "WebSocket error: %s", errorMsg.c_str());
-						callback(filePath, nullptr, 0, true);
-						webSocket.disconnect();
 					}
+				} else if (type == "response.audio.delta") {
+					// Received audio delta (base64 encoded)
+					String audioBase64 = doc["delta"] | "";
+					// Decode base64 to audio data
+					std::vector<uint8_t> audioData = this->base64Decode(audioBase64);
+					callback(filePath, audioData.data(), audioData.size(), false);
+				} else if (type == "response.audio.done") {
+					ESP_LOGI("STS", "Response audio done");
+					callback(filePath, nullptr, 0, true);
+					gptWebSocket.disconnect();
+				} else if (type == "error") {
+					String errorMsg = doc["error"]["message"] | "Unknown error";
+					ESP_LOGE("STS", "WebSocket error: %s", errorMsg.c_str());
+					callback(filePath, nullptr, 0, true);
+					gptWebSocket.disconnect();
 				}
-				break;
-			case WStype_BIN:
-				ESP_LOGW("STS", "Received binary message (%d bytes) - not handled", length);
-				break;
-			case WStype_ERROR:
-				ESP_LOGE("STS", "WebSocket error occurred");
-				callback(filePath, nullptr, 0, true);
-				webSocket.disconnect();
-				break;
-			case WStype_FRAGMENT_TEXT_START:
-			case WStype_FRAGMENT_BIN_START:
-			case WStype_FRAGMENT:
-			case WStype_FRAGMENT_FIN:
-				ESP_LOGW("STS", "Received fragmented message - not handled");
-				break;
-			case WStype_PING:
-				ESP_LOGD("STS", "Received PING");
-				break;
-			case WStype_PONG:
-				ESP_LOGD("STS", "Received PONG");
-				break;
-			case WStype_DISCONNECTED:
-				ESP_LOGI("STS", "WebSocket disconnected");
-				break;
-			default:
-				ESP_LOGW("STS", "Unknown WebSocket event type: %d", type);
-				break;
+			}
+			break;
+		case WStype_BIN:
+			ESP_LOGW("STS", "Received binary message (%d bytes) - not handled", length);
+			break;
+		case WStype_ERROR:
+			ESP_LOGE("STS", "WebSocket error occurred");
+			callback(filePath, nullptr, 0, true);
+			gptWebSocket.disconnect();
+			break;
+		case WStype_FRAGMENT_TEXT_START:
+		case WStype_FRAGMENT_BIN_START:
+		case WStype_FRAGMENT:
+		case WStype_FRAGMENT_FIN:
+			ESP_LOGW("STS", "Received fragmented message - not handled");
+			break;
+		case WStype_PING:
+			ESP_LOGD("STS", "Received PING");
+			break;
+		case WStype_PONG:
+			ESP_LOGD("STS", "Received PONG");
+			break;
+		case WStype_DISCONNECTED:
+			ESP_LOGI("STS", "WebSocket disconnected");
+			break;
+		default:
+			ESP_LOGW("STS", "Unknown WebSocket event type: %d", type);
+			break;
 		}
 	});
 
 	// Connect to WebSocket
 	String url = "/v1/realtime?model=" + model;
 	String authHeader = "Authorization: Bearer " + _apiKey + "\r\n";
-	webSocket.setExtraHeaders(authHeader.c_str());
-	webSocket.beginSSL("api.openai.com", 443, url.c_str());
-	webSocket.setReconnectInterval(5000);
+	gptWebSocket.setExtraHeaders(authHeader.c_str());
+	gptWebSocket.beginSSL("api.openai.com", 443, url.c_str());
+	gptWebSocket.setReconnectInterval(5000);
 
 	// Wait for connection and process
 	unsigned long startTime = millis();
-	while (webSocket.isConnected() && (millis() - startTime) < 30000) { // 30 second timeout
-		webSocket.loop();
+	while (gptWebSocket.isConnected() && (millis() - startTime) < 30000) { // 30 second timeout
+		gptWebSocket.loop();
 		delay(10);
 	}
 
-	if (!webSocket.isConnected()) {
+	if (!gptWebSocket.isConnected()) {
 		ESP_LOGE("STS", "WebSocket connection failed or timed out");
 		callback(filePath, nullptr, 0, true);
 	}
 
-	webSocket.disconnect();
+	gptWebSocket.disconnect();
 }
 
 String GPTStsService::buildSessionConfig() {
 	GPTSpiJsonDocument doc;
 	doc["type"] = "session.update";
-	doc["session"]["modalities"][0] = "text";
 	doc["session"]["modalities"][1] = "audio";
 	doc["session"]["instructions"] = "You are a helpful assistant.";
 	doc["session"]["voice"] = _voice;
 	doc["session"]["input_audio_format"] = "pcm16";
 	doc["session"]["output_audio_format"] = "pcm16";
-	doc["session"]["input_audio_transcription"]["model"] = "whisper-1";
+	doc["session"]["input_audio_transcription"]["model"] = "gpt-4o-mini-transcribe";
 	doc["session"]["turn_detection"]["type"] = "server_vad";
 	doc["session"]["turn_detection"]["threshold"] = 0.5;
 	doc["session"]["turn_detection"]["prefix_padding_ms"] = 300;
-	doc["session"]["turn_detection"]["silence_duration_ms"] = 200;
+	doc["session"]["turn_detection"]["silence_duration_ms"] = 500;
 	doc["session"]["temperature"] = 0.8;
 	doc["session"]["max_response_output_tokens"] = 4096;
 
@@ -362,6 +356,7 @@ void GPTStsService::stop() {
 	}
 
 	_isStreaming = false;
+	_isGPTSpeaking = false; // Reset speaking flag
 
 	if (_streamingTask != nullptr) {
 		vTaskDelete(_streamingTask);
@@ -372,15 +367,11 @@ void GPTStsService::stop() {
 }
 
 void GPTStsService::streamingTask() {
-	WebSocketsClient webSocket;
-	WiFiClientSecure client;
-	client.setInsecure();
-
 	bool sessionCreated = false;
 	unsigned long wsLastLoop = 0;
 
 	// WebSocket event handler
-	webSocket.onEvent([this, &sessionCreated](WStype_t type, uint8_t* payload, size_t length) {
+	gptWebSocket.onEvent([this, &sessionCreated](WStype_t type, uint8_t* payload, size_t length) {
 		switch (type) {
 			case WStype_CONNECTED:
 				ESP_LOGI("STS", "WebSocket connected for streaming");
@@ -424,6 +415,7 @@ void GPTStsService::streamingTask() {
 						ESP_LOGD("STS", "Received output audio transcript delta: %s", textDelta.c_str());
 					} else if (type == "response.created" && sessionCreated) {
 						ESP_LOGI("STS", "Response created");
+						_isGPTSpeaking = true;
 					} else if (type == "response.output_item.added" && sessionCreated) {
 						ESP_LOGD("STS", "Response output item added");
 					} else if (type == "response.output_item.done" && sessionCreated) {
@@ -432,6 +424,7 @@ void GPTStsService::streamingTask() {
 						ESP_LOGD("STS", "Response content part added");
 					} else if (type == "response.done" && sessionCreated) {
 						ESP_LOGD("STS", "Response completed");
+						_isGPTSpeaking = false;
 						if (_audioResponseCallback) {
 							_audioResponseCallback(nullptr, 0, true); // Signal end of response
 						}
@@ -484,6 +477,7 @@ void GPTStsService::streamingTask() {
 			case WStype_DISCONNECTED:
 				ESP_LOGI("STS", "WebSocket disconnected (sessionCreated: %d, _isStreaming: %d, reason: %.*s)", sessionCreated, _isStreaming, length, (char*)payload);
 				sessionCreated = false;
+				_isGPTSpeaking = false; // Reset speaking flag on disconnect
 				break;
 			default:
 				ESP_LOGW("STS", "Unknown WebSocket event type: %d", type);
@@ -494,25 +488,25 @@ void GPTStsService::streamingTask() {
 	// Connect to WebSocket
 	String url = "/v1/realtime?model=" + _model;
 	String authHeader = "Bearer " + _apiKey;
-	webSocket.beginSSL("api.openai.com", 443, url.c_str());
-	webSocket.setAuthorization(authHeader.c_str());
-	webSocket.setReconnectInterval(5000);
+	gptWebSocket.beginSSL("api.openai.com", 443, url.c_str());
+	gptWebSocket.setAuthorization(authHeader.c_str());
+	gptWebSocket.setReconnectInterval(5000);
 
 	// Send session configuration
 	String config = this->buildSessionConfig();
-	webSocket.sendTXT(config);
+	gptWebSocket.sendTXT(config);
 
 	// Main streaming loop
 	bool wsConnected = true;
 	while (_isStreaming) {
 		if (millis() - wsLastLoop > 10){
-			webSocket.loop();
+			gptWebSocket.loop();
 			wsLastLoop = millis();
-			wsConnected = webSocket.isConnected();
+			wsConnected = gptWebSocket.isConnected();
 		}
 
-		// Continuously send audio data if available
-		if (wsConnected && sessionCreated && _audioFillCallback) {
+		// Continuously send audio data if available (only when GPT is not speaking)
+		if (wsConnected && sessionCreated && !_isGPTSpeaking && _audioFillCallback) {
 			const size_t bufferSize = 1536; 
 			uint8_t* buffer = (uint8_t*) heap_caps_malloc(bufferSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t bytesRead = _audioFillCallback(buffer, bufferSize);
@@ -522,7 +516,7 @@ void GPTStsService::streamingTask() {
 				// Encode audio to base64 and send
 				String audioData = this->base64Encode(buffer, bytesRead);
 				String audioMessage = "{\"type\":\"input_audio_buffer.append\",\"audio\":\"" + audioData + "\"}";
-				webSocket.sendTXT(audioMessage);
+				gptWebSocket.sendTXT(audioMessage);
 			}
 
 			heap_caps_free(buffer);
@@ -533,7 +527,7 @@ void GPTStsService::streamingTask() {
 	}
 
 	ESP_LOGI("STS", "Streaming loop exited (_isStreaming: %d)", _isStreaming);
-	webSocket.disconnect();
+	gptWebSocket.disconnect();
 	ESP_LOGI("STS", "Streaming task ended");
 }
 

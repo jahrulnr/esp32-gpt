@@ -103,21 +103,19 @@ void GPTService::sendPromptWithContext(const String& prompt,
 		auto* params = static_cast<std::tuple<GPTService*, String, ResponseCallback>*>(param);
 		auto& [service, payload, cb] = *params;
 
-		HTTPClient http;
-		wifiClient.setInsecure(); // For HTTPS without certificate validation
-
-		http.begin(wifiClient, "https://api.openai.com/v1/responses");
-		http.setReuse(false);
-		http.addHeader("Content-Type", "application/json");
-		http.addHeader("Authorization", "Bearer " + service->_apiKey);
-		http.setTimeout(30000); // 30 second timeout
+		gptWifiClient.setInsecure(); // For HTTPS without certificate validation
+		gptHttp.begin(gptWifiClient, "https://api.openai.com/v1/responses");
+		gptHttp.setReuse(false);
+		gptHttp.addHeader("Content-Type", "application/json");
+		gptHttp.addHeader("Authorization", "Bearer " + service->_apiKey);
+		gptHttp.setTimeout(30000); // 30 second timeout
 
 		ESP_LOGI("GPT", "Sending request to OpenAI API...");
 
-		int httpCode = http.POST(payload);
+		int httpCode = gptHttp.POST(payload);
 
 		if (httpCode > 0) {
-			String response = http.getString();
+			String response = gptHttp.getString();
 			ESP_LOGI("GPT", "API response received, code: %d", httpCode);
 			service->processResponse(httpCode, response, payload, cb);
 		} else {
@@ -125,7 +123,7 @@ void GPTService::sendPromptWithContext(const String& prompt,
 			cb(payload, "Error: Failed to connect to GPT API");
 		}
 
-		http.end();
+		gptHttp.end();
 		delete params;
 		params = nullptr;
 		vTaskDelete(NULL);

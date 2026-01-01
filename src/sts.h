@@ -122,6 +122,7 @@ private:
 
 	// Streaming state
 	bool _isStreaming;
+	bool _isGPTSpeaking;
 	TaskHandle_t _streamingTask;
 	AudioFillCallback _audioFillCallback;
 	AudioResponseCallback _audioResponseCallback;
