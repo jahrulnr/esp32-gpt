@@ -134,6 +134,7 @@ void GPTSttService::transcribeAudio(const String& filePath, const String& model,
 		wifiClient.setInsecure(); // For HTTPS without certificate validation
 
 		http.begin(wifiClient, "https://api.openai.com/v1/audio/transcriptions");
+    http.setReuse(false);
 		http.addHeader("Content-Type", "multipart/form-data; boundary=" + bnd);
 		http.addHeader("Authorization", "Bearer " + service->_apiKey);
 		http.setTimeout(30000); // 30 second timeout
