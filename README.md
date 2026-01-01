@@ -9,8 +9,10 @@ An Arduino library for ESP32 microcontrollers to communicate with OpenAI GPT mod
 - Multiple model support (gpt-5-nano, gpt-4o-mini, etc.)
 - Text-to-speech (TTS) functionality with multiple voice options
 - Streaming TTS for real-time audio generation with lower latency
-- Audio transcription using OpenAI's Whisper API
-- Asynchronous HTTP requests with callback responses for GPT, TTS, and transcription
+- Audio transcription using OpenAI's
+- Speech-to-speech (STS) functionality using OpenAI's Realtime API (untested)
+- Continuous streaming STS for real-time voice conversations (untested)
+- Asynchronous HTTP/WebSocket requests with callback responses for GPT, TTS, transcription, and STS
 - Easy integration with Arduino projects
 
 ## Installation
@@ -28,7 +30,8 @@ The `examples` folder contains sample sketches demonstrating different features:
 - `gpt/basic.ino` - Basic GPT conversation
 - `tts/basic.ino` - Regular text-to-speech
 - `tts/streaming.ino` - Streaming text-to-speech for lower latency
-- `transcription/basic.ino` - Audio transcription
+- `stt/basic.ino` - Audio transcription
+- `sts/basic.ino` - Speech-to-speech conversion and streaming
 
 ## Usage
 
@@ -223,6 +226,102 @@ void setup() {
 
 void loop() {
     // Your code here
+}
+```
+
+### Speech-to-Speech Example
+
+```cpp
+#include <WiFi.h>
+#include <SPIFFS.h>
+#include <sts.h>
+
+// Replace with your credentials
+const char* ssid = "your-ssid";
+const char* password = "your-password";
+#define STS_API_KEY "your-openai-api-key"
+
+// Callback for STS responses
+void stsCallback(const String& filePath, const uint8_t* audioData, size_t audioSize) {
+    Serial.println("Speech-to-speech completed!");
+    Serial.printf("File: %s\n", filePath.c_str());
+    Serial.printf("Audio size: %d bytes\n", audioSize);
+    
+    // Save or play the audio response
+    // Your audio output code here
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Connect to WiFi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+    }
+    
+    // Initialize STS service
+    aiSts.init(STS_API_KEY, LittleFS);
+    
+    // Process audio file (must be WAV format)
+    aiSts.speechToSpeech("/input.wav", stsCallback);
+}
+
+void loop() {
+    // Your code here
+}
+```
+
+### Streaming Speech-to-Speech Example
+
+```cpp
+#include <WiFi.h>
+#include <sts.h>
+
+// Replace with your credentials
+const char* ssid = "your-ssid";
+const char* password = "your-password";
+#define STS_API_KEY "your-openai-api-key"
+
+// Callback to provide audio data for streaming
+size_t audioFillCallback(uint8_t* buffer, size_t maxSize) {
+    // Read audio from microphone or buffer
+    // Return number of bytes written to buffer
+    return bytesRead;
+}
+
+// Callback to receive streaming audio responses
+void audioResponseCallback(const uint8_t* audioData, size_t audioSize, bool isLastChunk) {
+    // Play or process the received audio
+    if (isLastChunk) {
+        Serial.println("Response complete");
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Connect to WiFi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+    }
+    
+    // Initialize STS service
+    aiSts.init(STS_API_KEY, LittleFS);
+    
+    // Start continuous streaming
+    aiSts.start(audioFillCallback, audioResponseCallback);
+}
+
+void loop() {
+    // Monitor streaming status
+    if (aiSts.isStreaming()) {
+        // Streaming is active
+    }
+    
+    // Stop streaming when needed
+    // aiSts.stop();
 }
 ```
 
