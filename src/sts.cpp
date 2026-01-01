@@ -1,4 +1,5 @@
 #include "sts.h"
+
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
@@ -420,17 +421,17 @@ void GPTStsService::streamingTask() {
 						ESP_LOGI("STS", "Received text delta: %s", textDelta.c_str());
 					} else if (type == "response.output_audio_transcript.delta" && sessionCreated) {
 						String textDelta = doc["delta"] | "";
-						ESP_LOGI("STS", "Received output audio transcript delta: %s", textDelta.c_str());
+						ESP_LOGD("STS", "Received output audio transcript delta: %s", textDelta.c_str());
 					} else if (type == "response.created" && sessionCreated) {
 						ESP_LOGI("STS", "Response created");
 					} else if (type == "response.output_item.added" && sessionCreated) {
-						ESP_LOGI("STS", "Response output item added");
+						ESP_LOGD("STS", "Response output item added");
 					} else if (type == "response.output_item.done" && sessionCreated) {
 						ESP_LOGI("STS", "Response output item done");
 					} else if (type == "response.content_part.added" && sessionCreated) {
 						ESP_LOGD("STS", "Response content part added");
 					} else if (type == "response.done" && sessionCreated) {
-						ESP_LOGI("STS", "Response completed");
+						ESP_LOGD("STS", "Response completed");
 						if (_audioResponseCallback) {
 							_audioResponseCallback(nullptr, 0, true); // Signal end of response
 						}
@@ -447,6 +448,14 @@ void GPTStsService::streamingTask() {
 						ESP_LOGI("STS", "Speech started");
 					} else if (type == "input_audio_buffer.speech_stopped") {
 						ESP_LOGI("STS", "Speech stopped - server will create response");
+					} else if (type == "response.output_audio.done" && sessionCreated) {
+						ESP_LOGD("STS", "Response output audio done");
+					} else if (type == "response.output_audio_transcript.done" && sessionCreated) {
+						ESP_LOGD("STS", "Response output audio transcript done");
+					} else if (type == "response.content_part.done" && sessionCreated) {
+						ESP_LOGD("STS", "Response content part done");
+					} else if (type == "rate_limits.updated") {
+						ESP_LOGD("STS", "Rate limits updated");
 					} else {
 						ESP_LOGW("STS", "Unknown Response type: %s", type.c_str());
 						ESP_LOGW("STS", "%s", (char*)payload);
@@ -473,9 +482,8 @@ void GPTStsService::streamingTask() {
 				ESP_LOGI("STS", "Received PONG");
 				break;
 			case WStype_DISCONNECTED:
-				ESP_LOGI("STS", "WebSocket disconnected");
+				ESP_LOGI("STS", "WebSocket disconnected (sessionCreated: %d, _isStreaming: %d, reason: %.*s)", sessionCreated, _isStreaming, length, (char*)payload);
 				sessionCreated = false;
-				_isStreaming = false; // Stop streaming on disconnect
 				break;
 			default:
 				ESP_LOGW("STS", "Unknown WebSocket event type: %d", type);
@@ -495,14 +503,16 @@ void GPTStsService::streamingTask() {
 	webSocket.sendTXT(config);
 
 	// Main streaming loop
+	bool wsConnected = true;
 	while (_isStreaming) {
 		if (millis() - wsLastLoop > 10){
 			webSocket.loop();
 			wsLastLoop = millis();
+			wsConnected = webSocket.isConnected();
 		}
 
 		// Continuously send audio data if available
-		if (sessionCreated && _audioFillCallback) {
+		if (wsConnected && sessionCreated && _audioFillCallback) {
 			const size_t bufferSize = 1536; 
 			uint8_t* buffer = (uint8_t*) heap_caps_malloc(bufferSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t bytesRead = _audioFillCallback(buffer, bufferSize);
@@ -522,6 +532,7 @@ void GPTStsService::streamingTask() {
 		taskYIELD();
 	}
 
+	ESP_LOGI("STS", "Streaming loop exited (_isStreaming: %d)", _isStreaming);
 	webSocket.disconnect();
 	ESP_LOGI("STS", "Streaming task ended");
 }
