@@ -16,7 +16,7 @@ static const GPTStsModel AVAILABLE_MODELS[] = {
 static const size_t NUM_MODELS = sizeof(AVAILABLE_MODELS) / sizeof(AVAILABLE_MODELS[0]);
 
 GPTStsService::GPTStsService()
-	: _model("gpt-4o-mini-realtime-preview")
+	: _model("gpt-realtime-mini")
 	, _voice("shimmer")
 	, _initialized(false)
 	, _fs(nullptr)
@@ -227,11 +227,11 @@ String GPTStsService::buildSessionConfig() {
 	doc["session"]["voice"] = _voice;
 	doc["session"]["input_audio_format"] = "pcm16";
 	doc["session"]["output_audio_format"] = "pcm16";
-	doc["session"]["input_audio_transcription"]["model"] = "gpt-4o-mini-transcribe";
+	doc["session"]["input_audio_transcription"]["model"] = "whisper-1";
 	doc["session"]["turn_detection"]["type"] = "server_vad";
 	doc["session"]["turn_detection"]["threshold"] = 0.5;
 	doc["session"]["turn_detection"]["prefix_padding_ms"] = 300;
-	doc["session"]["turn_detection"]["silence_duration_ms"] = 500;
+	doc["session"]["turn_detection"]["silence_duration_ms"] = 1000;
 	doc["session"]["temperature"] = 0.8;
 	doc["session"]["max_response_output_tokens"] = 4096;
 
@@ -344,7 +344,7 @@ bool GPTStsService::start(AudioFillCallback audioFillCallback, AudioResponseCall
 		GPTStsService* service = static_cast<GPTStsService*>(param);
 		service->streamingTask();
 		vTaskDelete(service->_streamingTask);
-	}, "STS_Streaming", 16384, this, 6, &_streamingTask, 1);
+	}, "STS_Streaming", 16384, this, 5, &_streamingTask, 1);
 
 	ESP_LOGI("STS", "Streaming started");
 	return true;
