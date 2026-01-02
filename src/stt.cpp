@@ -130,30 +130,30 @@ void GPTSttService::transcribeAudio(const String& filePath, const String& model,
 		auto* params = static_cast<std::tuple<GPTSttService*, String, String, String, TranscriptionCallback>*>(param);
 		auto& [service, payload, file, bnd, cb] = *params;
 
-		gptWifiClient.setInsecure(); // For HTTPS without certificate validation
-		gptHttp.begin(gptWifiClient, "https://api.openai.com/v1/audio/transcriptions");
-    gptHttp.setReuse(false);
-		gptHttp.addHeader("Content-Type", "multipart/form-data; boundary=" + bnd);
-		gptHttp.addHeader("Authorization", "Bearer " + service->_apiKey);
-		gptHttp.setTimeout(30000); // 30 second timeout
+		gptWifiClient->setInsecure(); // For HTTPS without certificate validation
+		gptHttp->begin(*gptWifiClient, "https://api.openai.com/v1/audio/transcriptions");
+    gptHttp->setReuse(false);
+		gptHttp->addHeader("Content-Type", "multipart/form-data; boundary=" + bnd);
+		gptHttp->addHeader("Authorization", "Bearer " + service->_apiKey);
+		gptHttp->setTimeout(30000); // 30 second timeout
 
 		ESP_LOGI("TRANSCRIPTION", "Sending transcription request to OpenAI API...");
 		ESP_LOGI("TRANSCRIPTION", "File: %s", file.c_str());
 		ESP_LOGI("TRANSCRIPTION", "Model: %s", service->_model.c_str());
 
-		int httpCode = gptHttp.POST(payload);
+		int httpCode = gptHttp->POST(payload);
 
 		if (httpCode == 200) {
-			String response = gptHttp.getString();
+			String response = gptHttp->getString();
 			ESP_LOGI("TRANSCRIPTION", "Transcription successful");
 			service->processResponse(httpCode, response, file, cb);
 		} else {
-			String response = gptHttp.getString();
+			String response = gptHttp->getString();
 			ESP_LOGE("TRANSCRIPTION", "API returned error code: %d", httpCode);
 			service->processResponse(httpCode, response, file, cb);
 		}
 
-		gptHttp.end();
+		gptHttp->end();
 		delete params;
 		params = nullptr;
 		vTaskDelete(NULL);

@@ -1,5 +1,5 @@
 #include "core.h"
 
-GPTWifiClient gptWifiClient;
-GPTClient gptHttp;
-WebSocketsClient gptWebSocket;
+GPTWifiClient *gptWifiClient = new GPTWifiClient;
+GPTClient *gptHttp = new GPTClient;
+WebSocketsClient *gptWebSocket = new WebSocketsClient;

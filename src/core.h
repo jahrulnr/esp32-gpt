@@ -361,6 +361,6 @@ public:
   }
 };
 
-extern GPTWifiClient gptWifiClient;
-extern GPTClient gptHttp;
-extern WebSocketsClient gptWebSocket;
+extern GPTWifiClient* gptWifiClient;
+extern GPTClient* gptHttp;
+extern WebSocketsClient* gptWebSocket;

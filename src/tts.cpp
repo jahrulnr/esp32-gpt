@@ -101,13 +101,13 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 		auto* params = static_cast<std::tuple<GPTTtsService*, String, String, CallbackType, bool>*>(param);
 		auto& [service, payload, txt, cb, streaming] = *params;
 
-		gptWifiClient.setInsecure(); // For HTTPS without certificate validation
-		gptHttp.begin(gptWifiClient, "https://api.openai.com/v1/audio/speech");
-		gptHttp.setReuse(false);
-		gptHttp.addHeader("Content-Type", "application/json");
-		gptHttp.addHeader("Accept", "*/*");
-		gptHttp.addHeader("Authorization", "Bearer " + service->_apiKey);
-		gptHttp.setTimeout(30000); // 30 second timeout
+		gptWifiClient->setInsecure(); // For HTTPS without certificate validation
+		gptHttp->begin(*gptWifiClient, "https://api.openai.com/v1/audio/speech");
+		gptHttp->setReuse(false);
+		gptHttp->addHeader("Content-Type", "application/json");
+		gptHttp->addHeader("Accept", "*/*");
+		gptHttp->addHeader("Authorization", "Bearer " + service->_apiKey);
+		gptHttp->setTimeout(30000); // 30 second timeout
 
 		// Collect response headers
 		const char* headerKeys[] = {
@@ -116,7 +116,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 			"Transfer-Encoding", 
 			"Connection", 
 		};
-		gptHttp.collectHeaders(headerKeys, sizeof(headerKeys)/sizeof(headerKeys[0]));
+		gptHttp->collectHeaders(headerKeys, sizeof(headerKeys)/sizeof(headerKeys[0]));
 
 		// Print all headers being sent
 		ESP_LOGI("TTS", "=== TTS Request Headers ===");
@@ -133,12 +133,12 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 			ESP_LOGI("TTS", "Sending TTS request to OpenAI API...");
 		}
 
-		int httpCode = gptHttp.POST(payload);
+		int httpCode = gptHttp->POST(payload);
 
 		if (httpCode == 200) {
 			// Handle audio data based on streaming mode
-			WiFiClient* stream = gptHttp.getStreamPtr();
-			int contentLength = gptHttp.getSize();
+			WiFiClient* stream = gptHttp->getStreamPtr();
+			int contentLength = gptHttp->getSize();
 			
 			
 			if (streaming) {
@@ -206,7 +206,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 			
 			heap_caps_free(buffer);
 		} else {
-			String response = gptHttp.getString();
+			String response = gptHttp->getString();
 			ESP_LOGE("TTS", "API returned error code: %d", httpCode);
 
 			JsonDocument errorDoc;
@@ -225,13 +225,13 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 		}
 		
 		// Get all collected headers
-		for(int i = 0; i < gptHttp.headers(); i++) {
-			String headerName = gptHttp.headerName(i);
-			String headerValue = gptHttp.header(i);
+		for(int i = 0; i < gptHttp->headers(); i++) {
+			String headerName = gptHttp->headerName(i);
+			String headerValue = gptHttp->header(i);
 			ESP_LOGI("TTS", "%s: %s", headerName.c_str(), headerValue.c_str());
 		}
 
-		gptHttp.end();
+		gptHttp->end();
 		delete params;
 		params = nullptr;
 		vTaskDelete(NULL);
