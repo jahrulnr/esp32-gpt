@@ -222,12 +222,12 @@ void GPTStsService::performStsStreaming(const String& filePath, const String& mo
 String GPTStsService::buildSessionConfig() {
 	GPTSpiJsonDocument doc;
 	doc["type"] = "session.update";
-	doc["session"]["modalities"][1] = "audio";
+	doc["session"]["modalities"][0] = "audio";
 	doc["session"]["instructions"] = "You are a helpful assistant.";
 	doc["session"]["voice"] = _voice;
 	doc["session"]["input_audio_format"] = "pcm16";
 	doc["session"]["output_audio_format"] = "pcm16";
-	doc["session"]["input_audio_transcription"]["model"] = "whisper-1";
+	doc["session"]["input_audio_transcription"]["model"] = "gpt-4o-mini-transcribe";
 	doc["session"]["turn_detection"]["type"] = "server_vad";
 	doc["session"]["turn_detection"]["threshold"] = 0.5;
 	doc["session"]["turn_detection"]["prefix_padding_ms"] = 300;
@@ -344,7 +344,7 @@ bool GPTStsService::start(AudioFillCallback audioFillCallback, AudioResponseCall
 		GPTStsService* service = static_cast<GPTStsService*>(param);
 		service->streamingTask();
 		vTaskDelete(service->_streamingTask);
-	}, "STS_Streaming", 16384, this, 5, &_streamingTask, 1);
+	}, "STS_Streaming", 16384, this, 10, &_streamingTask, 1);
 
 	ESP_LOGI("STS", "Streaming started");
 	return true;
@@ -526,7 +526,7 @@ void GPTStsService::streamingTask() {
 			memset(buffer, 0, bufferSize);
 		}
 		
-		taskYIELD();
+		delay(1);
 	}
 	heap_caps_free(buffer);
 
