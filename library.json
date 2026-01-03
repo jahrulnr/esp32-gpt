@@ -21,7 +21,7 @@
   "dependencies": 
   {
     "bblanchon/ArduinoJson": "^7.0.3",
-    "Links2004/arduinoWebSockets": "https://github.com/Links2004/arduinoWebSockets.git#2.7.2"
+    "Links2004/arduinoWebSockets": "https://github.com/jahrulnr/arduinoWebSockets.git"
   },
   "export": {
     "include": [

@@ -17,17 +17,35 @@ typedef struct GPTStsModel {
  */
 class GPTStsService {
 public:
-	// Callback type for STS responses (audio data)
-	using AudioCallback = std::function<void(const String& filePath, const uint8_t* audioData, size_t audioSize)>;
 
-	// Callback type for streaming STS responses (audio chunks)
-	using StreamCallback = std::function<void(const String& filePath, const uint8_t* audioChunk, size_t chunkSize, bool isLastChunk)>;
+	struct GPTTool {
+		const char* description;
+		const char* name;
+	};
 
+	struct GPTToolCall {
+		const char* callId;
+		const char* name;
+		const char* args;
+	};
+
+	struct GPTToolCallback {
+		const char* callId;
+		const char* name;
+		const char* output;
+		const char* status;
+	};
+	
 	// Callback type for audio fill (provide audio data for streaming)
 	using AudioFillCallback = std::function<size_t(uint8_t* buffer, size_t maxSize)>;
 
 	// Callback type for audio response (receive streaming audio response)
 	using AudioResponseCallback = std::function<void(const uint8_t* audioData, size_t audioSize, bool isLastChunk)>;
+
+	// event callbcak
+	using EventConnectedCallback = std::function<void(void)>;
+	using EventUpdatedCallback = std::function<void(const char*)>;
+	using EventFunctionCallback = std::function<void(const GPTToolCall&)>;
 
 	GPTStsService();
 	~GPTStsService();
@@ -38,7 +56,7 @@ public:
 	 * @param fs Reference to the filesystem (SPIFFS, LittleFS, etc.)
 	 * @return true if initialization successful
 	 */
-	bool init(const String& apiKey, fs::FS& fs);
+	bool init(const String& apiKey);
 
 	/**
 	 * Check if service is initialized
@@ -47,42 +65,18 @@ public:
 	bool isInitialized() const { return _initialized; }
 
 	/**
-	 * Process audio file with speech-to-speech
-	 * @param filePath Path to input audio file (WAV format)
-	 * @param callback Audio data callback
-	 */
-	void speechToSpeech(const String& filePath, AudioCallback callback);
-
-	/**
-	 * Process audio file with speech-to-speech using specific model
-	 * @param filePath Path to input audio file (WAV format)
-	 * @param model Model to use
-	 * @param callback Audio data callback
-	 */
-	void speechToSpeech(const String& filePath, const String& model, AudioCallback callback);
-
-	/**
-	 * Process audio file with streaming speech-to-speech
-	 * @param filePath Path to input audio file (WAV format)
-	 * @param callback Stream callback for audio chunks
-	 */
-	void speechToSpeechStream(const String& filePath, StreamCallback callback);
-
-	/**
-	 * Process audio file with streaming speech-to-speech using specific model
-	 * @param filePath Path to input audio file (WAV format)
-	 * @param model Model to use
-	 * @param callback Stream callback for audio chunks
-	 */
-	void speechToSpeechStream(const String& filePath, const String& model, StreamCallback callback);
-
-	/**
 	 * Start continuous streaming speech-to-speech session
 	 * @param audioFillCallback Callback to provide audio data when needed
 	 * @param audioResponseCallback Callback to receive audio responses
 	 * @return true if streaming started successfully
 	 */
-	bool start(AudioFillCallback audioFillCallback, AudioResponseCallback audioResponseCallback);
+	bool start(
+		AudioFillCallback audioFillCallback, 
+		AudioResponseCallback audioResponseCallback,
+		EventConnectedCallback eventConnectedCallback = nullptr,
+		EventUpdatedCallback eventUpdatedCallback = nullptr,
+		EventFunctionCallback eventFunctionCallback = nullptr
+		);
 
 	/**
 	 * Stop the continuous streaming session
@@ -112,23 +106,27 @@ public:
 	 * @return Vector of available models
 	 */
 	static std::vector<gpt_sts_t> getAvailableModels();
+	
+	bool sendTool(const GPTTool& tool);
+	bool sendToolCallback(const GPTToolCallback& toolCallback);
 
 private:
 	String _apiKey;
 	String _model;
 	String _voice;
 	bool _initialized;
-	fs::FS* _fs;
 
 	// Streaming state
 	bool _isStreaming;
 	bool _isGPTSpeaking;
 	TaskHandle_t _streamingTask;
+
+	// callback
 	AudioFillCallback _audioFillCallback;
 	AudioResponseCallback _audioResponseCallback;
-
-	// Process WebSocket streaming
-	void performStsStreaming(const String& filePath, const String& model, StreamCallback callback);
+	EventConnectedCallback _eventConnectedCallback;
+	EventUpdatedCallback _eventUpdatedCallback;
+	EventFunctionCallback _eventFunctionCallback;
 
 	// Continuous streaming task
 	void streamingTask();
