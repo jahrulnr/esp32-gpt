@@ -25,6 +25,7 @@ GPTStsService::GPTStsService()
 	, _eventConnectedCallback(nullptr)
 	, _eventUpdatedCallback(nullptr)
 	, _eventFunctionCallback(nullptr)
+	, _tools()
 {
 }
 
@@ -93,14 +94,20 @@ String GPTStsService::buildSessionConfig() {
 	return config;
 }
 
-bool GPTStsService::sendTool(const GPTTool& tool) {
+void GPTStsService::addTool(const GPTTool& tool){
+	_tools.push_back(tool);
+}
+
+bool GPTStsService::sendTools() {
 	GPTSpiJsonDocument doc;
 	doc["type"] = "session.update";
 	doc["session"]["type"] = "realtime";
-	doc["session"]["tools"][0]["description"] = tool.description;
-	doc["session"]["tools"][0]["name"] = tool.name;
-	// doc["session"]["tools"][0]["parameters"] = object;
-	doc["session"]["tools"][0]["type"] = "function";
+	for(int i = 0; i < _tools.size(); i++) {
+		doc["session"]["tools"][i]["description"] = _tools[i].description;
+		doc["session"]["tools"][i]["name"] = _tools[i].name;
+		// doc["session"]["tools"][i]["parameters"] = object;
+		doc["session"]["tools"][i]["type"] = "function";
+	}
 	
 	return gptWebSocket->sendTXT(doc.as<String>().c_str());
 }
@@ -146,11 +153,11 @@ bool GPTStsService::start(
 		return false;
 	}
 
-	_audioFillCallback = audioFillCallback;
-	_audioResponseCallback = audioResponseCallback;
-	_eventConnectedCallback = eventConnectedCallback;
-	_eventUpdatedCallback = eventUpdatedCallback;
-	_eventFunctionCallback = eventFunctionCallback;
+	if(audioFillCallback) _audioFillCallback = audioFillCallback;
+	if(audioResponseCallback) _audioResponseCallback = audioResponseCallback;
+	if(eventConnectedCallback) _eventConnectedCallback = eventConnectedCallback;
+	if(eventUpdatedCallback) _eventUpdatedCallback = eventUpdatedCallback;
+	if(eventFunctionCallback) _eventFunctionCallback = eventFunctionCallback;
 	_isStreaming = true;
 
 	// Create streaming task

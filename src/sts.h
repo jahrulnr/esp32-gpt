@@ -111,7 +111,8 @@ public:
 	 */
 	static std::vector<gpt_sts_t> getAvailableModels();
 	
-	bool sendTool(const GPTTool& tool);
+	void addTool(const GPTTool& tool);
+	bool sendTools();
 	bool sendToolCallback(const GPTToolCallback& toolCallback);
 
 private:
@@ -131,6 +132,7 @@ private:
 	EventConnectedCallback _eventConnectedCallback;
 	EventUpdatedCallback _eventUpdatedCallback;
 	EventFunctionCallback _eventFunctionCallback;
+	std::vector<GPTTool> _tools;
 
 	// Continuous streaming task
 	void streamingTask();
