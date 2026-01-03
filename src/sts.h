@@ -18,17 +18,21 @@ typedef struct GPTStsModel {
 class GPTStsService {
 public:
 
+	// setup tool
 	struct GPTTool {
 		const char* description;
 		const char* name;
+		const char* args;
 	};
 
+	// call the function
 	struct GPTToolCall {
 		const char* callId;
 		const char* name;
 		const char* args;
 	};
 
+	// trigger ai model with output
 	struct GPTToolCallback {
 		const char* callId;
 		const char* name;
