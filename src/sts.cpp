@@ -25,6 +25,7 @@ GPTStsService::GPTStsService()
 	, _eventConnectedCallback(nullptr)
 	, _eventUpdatedCallback(nullptr)
 	, _eventFunctionCallback(nullptr)
+	, _eventDisconnectCallback(nullptr)
 	, _tools()
 {
 }
@@ -105,7 +106,7 @@ bool GPTStsService::sendTools() {
 	for(int i = 0; i < _tools.size(); i++) {
 		doc["session"]["tools"][i]["description"] = _tools[i].description;
 		doc["session"]["tools"][i]["name"] = _tools[i].name;
-		// doc["session"]["tools"][i]["parameters"] = object;
+		doc["session"]["tools"][i]["parameters"] = _tools[i].params;
 		doc["session"]["tools"][i]["type"] = "function";
 	}
 	
@@ -136,7 +137,8 @@ bool GPTStsService::start(
 	AudioResponseCallback audioResponseCallback,
 	EventConnectedCallback eventConnectedCallback,
 	EventUpdatedCallback eventUpdatedCallback,
-	EventFunctionCallback eventFunctionCallback
+	EventFunctionCallback eventFunctionCallback,
+	EventDisconnectCallback _eventDisconnectCallback
 	) {
 	if (!_initialized) {
 		ESP_LOGE("STS", "STS service not initialized");
@@ -165,7 +167,7 @@ bool GPTStsService::start(
 		GPTStsService* service = static_cast<GPTStsService*>(param);
 		service->streamingTask();
 		vTaskDelete(service->_streamingTask);
-	}, "STS_Streaming", 16384, this, 10, &_streamingTask, 1);
+	}, "STS_Streaming", 16384, this, 11, &_streamingTask, 1);
 
 	ESP_LOGI("STS", "Streaming started");
 	return true;
@@ -264,11 +266,14 @@ void GPTStsService::streamingTask() {
 					} else if (type == "response.function_call_arguments.done") {
 						ESP_LOGI("STS", "Response function call arguments done: %s", (char*) payload);
 						if (_eventFunctionCallback) {
+							GPTSpiJsonDocument params;
+							deserializeJson(params, doc["arguments"].as<String>());
 							_eventFunctionCallback(GPTToolCall{
 								.callId = doc["call_id"],
 								.name = doc["name"],
-								.args = doc["arguments"]
-							}); 
+								.params = params
+							});
+							params.clear();
 						}
 					} else if (type == "conversation.item.input_audio_transcription.delta") {
 						ESP_LOGD("STS", "Conversation item input audio delta transcription");
@@ -375,6 +380,9 @@ void GPTStsService::streamingTask() {
 	ESP_LOGI("STS", "Streaming loop exited (_isStreaming: %d)", _isStreaming);
 	gptWebSocket->disconnect();
 	ESP_LOGI("STS", "Streaming task ended");
+	if (_eventDisconnectCallback) {
+		_eventDisconnectCallback();
+	}
 }
 
 String GPTStsService::base64Encode(const uint8_t* data, size_t length) {

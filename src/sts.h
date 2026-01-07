@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <FS.h>
+#include <core.h>
 
 typedef struct GPTStsModel {
 	const char* id;
@@ -22,14 +23,14 @@ public:
 	struct GPTTool {
 		const char* description;
 		const char* name;
-		const char* args;
+		GPTSpiJsonDocument params;
 	};
 
 	// call the function
 	struct GPTToolCall {
 		const char* callId;
 		const char* name;
-		const char* args;
+		GPTSpiJsonDocument params;
 	};
 
 	// trigger ai model with output
@@ -50,6 +51,7 @@ public:
 	using EventConnectedCallback = std::function<void(void)>;
 	using EventUpdatedCallback = std::function<void(const char*)>;
 	using EventFunctionCallback = std::function<void(const GPTToolCall&)>;
+	using EventDisconnectCallback = std::function<void(void)>;
 
 	GPTStsService();
 	~GPTStsService();
@@ -79,7 +81,8 @@ public:
 		AudioResponseCallback audioResponseCallback,
 		EventConnectedCallback eventConnectedCallback = nullptr,
 		EventUpdatedCallback eventUpdatedCallback = nullptr,
-		EventFunctionCallback eventFunctionCallback = nullptr
+		EventFunctionCallback eventFunctionCallback = nullptr,
+		EventDisconnectCallback eventDisconnectCallback = nullptr
 		);
 
 	/**
@@ -115,6 +118,8 @@ public:
 	bool sendTools();
 	bool sendToolCallback(const GPTToolCallback& toolCallback);
 
+	bool Speak() { return gptWebSocket->sendTXT("{\"type\":\"response.create\"}"); }
+
 private:
 	String _apiKey;
 	String _model;
@@ -132,6 +137,7 @@ private:
 	EventConnectedCallback _eventConnectedCallback;
 	EventUpdatedCallback _eventUpdatedCallback;
 	EventFunctionCallback _eventFunctionCallback;
+	EventDisconnectCallback _eventDisconnectCallback;
 	std::vector<GPTTool> _tools;
 
 	// Continuous streaming task
