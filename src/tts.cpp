@@ -47,7 +47,7 @@ String GPTTtsService::buildJsonPayload(const String& text) {
 	doc["model"] = _model;
 	doc["input"] = text;
 	doc["voice"] = _voice;
-	doc["response_format"] = "wav";
+	doc["response_format"] = "pcm";
 	doc["instructions"] = "Speak softly with warmth, like a small robot chatting with a close friend late in the afternoon. The tone is relaxed, caring, and familiar. Use gentle pauses and light conversational fillers, naturally.";
 
 	String jsonString;
@@ -148,7 +148,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 				ESP_LOGI("TTS", "Starting to read audio data (Content-Length: %d)", contentLength);
 			}
 			
-			const size_t BUFFER_SIZE = 1152 * 10;
+			const size_t BUFFER_SIZE = 2400;
 			uint8_t* buffer = (uint8_t*)heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t totalBytesProcessed = 0;
 			if constexpr (std::is_same_v<CallbackType, AudioCallback>) {
