@@ -14,16 +14,12 @@ void ttsStreamCallback(const String& text, const uint8_t* audioChunk, size_t chu
     if (audioChunk && chunkSize > 0) {
         Serial.printf("Audio chunk received: %d bytes, isLast: %s\n", chunkSize, isLastChunk ? "true" : "false");
 
-        // Process audio chunk immediately for low-latency playback
-        // - Feed to MP3 decoder (e.g., using ESP32-speaker or custom Mp3Decoder)
-        // - Decode to PCM (handle 24kHz→16kHz resampling if needed)
-        // - Send to speaker via I2S (use PSRAM for buffers: MALLOC_CAP_SPIRAM)
-        // - Monitor for ERR_MP3_INVALID_HUFFCODES (-9) and skip corrupted frames
-        // Example: mp3Decoder.feedData(audioChunk, chunkSize); then getDecodedPCM()
+        // Here you would typically play the audio data
+        // For example, send to speaker or save to file
 
         if (isLastChunk) {
             Serial.println("TTS streaming completed!");
-            // Finalize decoder (e.g., flush remaining PCM, reset state)
+            // Finalize (e.g., reset state)
         }
     } else if (isLastChunk) {
         Serial.println("TTS streaming failed - no audio data");

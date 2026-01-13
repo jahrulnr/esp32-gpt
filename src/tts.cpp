@@ -47,6 +47,7 @@ String GPTTtsService::buildJsonPayload(const String& text) {
 	doc["model"] = _model;
 	doc["input"] = text;
 	doc["voice"] = _voice;
+	doc["response_format"] = "wav";
 	doc["instructions"] = "Speak softly with warmth, like a small robot chatting with a close friend late in the afternoon. The tone is relaxed, caring, and familiar. Use gentle pauses and light conversational fillers, naturally.";
 
 	String jsonString;
