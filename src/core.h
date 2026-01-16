@@ -4,6 +4,13 @@
 #include <WiFiClientSecure.h>
 #include <WebSocketsClient.h>
 
+// Enum for audio formats
+enum class GPTAudioFormat {
+    GPT_WAV,
+    GPT_PCM,
+    GPT_MP3
+};
+
 struct GPTSpiAllocator : ArduinoJson::Allocator {
   uint32_t getMemoryType() const {
     return MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT;

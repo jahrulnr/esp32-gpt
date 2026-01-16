@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <functional>
 #include <vector>
+#include "core.h"
 
 typedef struct GPTTtsVoice {
 	const char* id;
@@ -81,6 +82,18 @@ public:
 	void setVoice(const String& voice) { _voice = voice; }
 
 	/**
+	 * Set audio format
+	 * @param format Audio format enum
+	 */
+	void setFormat(GPTAudioFormat format);
+
+	/**
+	 * Get current audio format
+	 * @return Current audio format enum
+	 */
+	GPTAudioFormat getFormat() const;
+
+	/**
 	 * Get available TTS voices
 	 * @return Vector of available voices
 	 */
@@ -90,6 +103,7 @@ private:
 	String _apiKey;
 	String _model;
 	String _voice;
+	GPTAudioFormat _format;
 	bool _initialized;
 
 	// Common HTTP request handler

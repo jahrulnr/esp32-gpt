@@ -5,6 +5,15 @@
 #include <vector>
 #include "core.h"
 
+const char* formatToString(GPTAudioFormat fmt) {
+    switch (fmt) {
+        case GPTAudioFormat::GPT_WAV: return "wav";
+        case GPTAudioFormat::GPT_PCM: return "pcm";
+        case GPTAudioFormat::GPT_MP3: return "mp3";
+        default: return "wav";
+    }
+}
+
 // Available TTS voices
 static const GPTTtsVoice AVAILABLE_VOICES[] = {
 	{"alloy", "Alloy"},
@@ -20,6 +29,7 @@ static const size_t NUM_VOICES = sizeof(AVAILABLE_VOICES) / sizeof(AVAILABLE_VOI
 GPTTtsService::GPTTtsService()
 	: _model("gpt-4o-mini-tts")
 	, _voice("shimmer")
+	, _format(GPTAudioFormat::GPT_WAV)
 	, _initialized(false)
 {
 }
@@ -47,7 +57,7 @@ String GPTTtsService::buildJsonPayload(const String& text) {
 	doc["model"] = _model;
 	doc["input"] = text;
 	doc["voice"] = _voice;
-	doc["response_format"] = "pcm";
+	doc["response_format"] = formatToString(_format);
 	doc["instructions"] = "Speak softly with warmth, like a small robot chatting with a close friend late in the afternoon. The tone is relaxed, caring, and familiar. Use gentle pauses and light conversational fillers, naturally.";
 
 	String jsonString;
@@ -148,7 +158,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 				ESP_LOGI("TTS", "Starting to read audio data (Content-Length: %d)", contentLength);
 			}
 			
-			const size_t BUFFER_SIZE = 2400;
+			const size_t BUFFER_SIZE = 64 * 1024;
 			uint8_t* buffer = (uint8_t*)heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_DEFAULT);
 			size_t totalBytesProcessed = 0;
 			if constexpr (std::is_same_v<CallbackType, AudioCallback>) {
@@ -156,9 +166,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 				std::vector<uint8_t> audioData;
 				
 				while (stream->connected()) {
-					size_t bytesAvailable = stream->available();
-					size_t bytesToRead = min(bytesAvailable, BUFFER_SIZE);
-					size_t bytesRead = stream->readBytes(buffer, bytesToRead);
+					size_t bytesRead = stream->readBytes(buffer, BUFFER_SIZE);
 					
 					if (bytesRead > 0) {
 						audioData.insert(audioData.end(), buffer, buffer + bytesRead);
@@ -170,15 +178,7 @@ void GPTTtsService::performTtsRequest(const String& text, const String& voice, C
 				}
 				
 				if (totalBytesProcessed > 0) {
-					uint8_t* audioBuffer = (uint8_t*)heap_caps_malloc(totalBytesProcessed, MALLOC_CAP_SPIRAM);
-					if (audioBuffer) {
-						memcpy(audioBuffer, audioData.data(), totalBytesProcessed);
-						cb(txt, audioBuffer, totalBytesProcessed);
-						heap_caps_free(audioBuffer);
-					} else {
-						ESP_LOGE("TTS", "Failed to allocate memory for audio buffer");
-						cb(txt, nullptr, 0);
-					}
+					cb(txt, audioData.data(), totalBytesProcessed);
 				} else {
 					ESP_LOGE("TTS", "No audio data received");
 					cb(txt, nullptr, 0);
@@ -253,6 +253,14 @@ void GPTTtsService::textToSpeechStream(const String& text, StreamCallback callba
 
 void GPTTtsService::textToSpeechStream(const String& text, const String& voice, StreamCallback callback) {
 	performTtsRequest(text, voice, callback, true);
+}
+
+void GPTTtsService::setFormat(GPTAudioFormat format) {
+    _format = format;
+}
+
+GPTAudioFormat GPTTtsService::getFormat() const {
+    return _format;
 }
 
 std::vector<gpt_tts_t> GPTTtsService::getAvailableVoices() {
