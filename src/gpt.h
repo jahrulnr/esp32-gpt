@@ -12,51 +12,11 @@ struct GPTModel {
 	const char* displayName;
 };
 
-/**
- * Simple context cache for conversation history
- */
-class ContextCache {
-public:
-	struct Message {
-		String role;
-		String content;
-		unsigned long timestamp;
-	};
-
-	ContextCache(size_t maxMessages = 10) : _maxMessages(maxMessages) {}
-
-	void addMessage(const String& role, const String& content) {
-		Message msg = {role, content, millis()};
-		_messages.push_back(msg);
-
-		// Keep only recent messages
-		if (_messages.size() > _maxMessages) {
-			_messages.erase(_messages.begin());
-		}
-	}
-
-	std::vector<Message> getRecentMessages(size_t count = 5) const {
-		if (_messages.size() <= count) {
-			return _messages;
-		}
-
-		// Return most recent messages
-		return std::vector<Message>(_messages.end() - count, _messages.end());
-	}
-
-	void clear() {
-		_messages.clear();
-	}
-
-private:
-	std::vector<Message> _messages;
-	size_t _maxMessages;
-};
-
 class GPTService {
 public:
 	// Callback type for GPT responses
 	using ResponseCallback = std::function<void(const String& payload, const String& response)>;
+	using FuncCallback = std::function<void(const String& payload, const String& funcCall)>;
 
 	GPTService();
 	~GPTService();
@@ -117,19 +77,11 @@ public:
 	 */
 	static std::vector<GPTModel> getAvailableModels();
 
-	/**
-	 * Reset conversation state for new conversation
-	 */
-	void resetConversation();
-
 private:
 	String _apiKey;
 	String _model;
 	String _systemMessage;
 	bool _initialized;
-	ContextCache _contextCache;
-	bool _storeResponse; // Store gpt response as cache token
-	String _previousResponseId; // For conversation state
 
 	// Process API response
 	void processResponse(int httpCode, const String& response, const String& userPrompt, ResponseCallback callback);
@@ -139,6 +91,7 @@ private:
 
 	// Extract response from JSON
 	String extractResponse(const String& jsonResponse);
+	String extractFuncCall(const String& jsonResponse);
 };
 
 extern GPTService ai;
